@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Unrelated local files (coursework, design scratch)
+designe/
+
+# IDE / tooling
+.vscode/
+.claude/
+.pio/
+
+# Logs
+*.log
+
+# Large media (too big for git)
+*.mp4
+*.mov
+*.avi

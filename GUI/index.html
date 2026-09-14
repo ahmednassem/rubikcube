@@ -1,0 +1,301 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RubikCube</title>
+  <script>
+    // Apply the saved theme before CSS paints to avoid a flash. Falls back
+    // to the profile website's theme choice ("theme" key :  same origin), so
+    // opening the demo from the site keeps the same look.
+    (function () {
+      var t = localStorage.getItem("rubik-theme") || localStorage.getItem("theme");
+      document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
+    })();
+  </script>
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./js/lib/three.module.min.js",
+        "three/addons/controls/OrbitControls.js": "./js/lib/OrbitControls.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app">
+
+    <main class="stage">
+      <canvas id="scene"></canvas>
+
+      <div class="overlay scramble" id="scramble">
+        <h2>
+          <span>Scramble</span>
+          <span class="scramble-head-right">
+            <span class="mode-indicator normal" id="mode-indicator">
+              <span class="dot"></span>
+              <span class="label" id="mode-label">Normal</span>
+            </span>
+            <button id="theme-btn" class="theme-btn" title="Toggle light / dark theme">☾</button>
+            <a id="back-btn" class="theme-btn back-btn" href="../" title="Back to project page" style="display:none">←</a>
+          </span>
+        </h2>
+        <div class="scramble-text" id="scramble-text"></div>
+        <div class="scramble-bar" id="scramble-bar" hidden>
+          <button class="s-btn" id="s-prev" title="Previous move (←)">⏮</button>
+          <button class="s-btn" id="s-play" title="Play/Pause (Space)">▶</button>
+          <button class="s-btn" id="s-next" title="Next move (→)">⏭</button>
+          <button class="s-btn s-copy" id="s-copy" title="Copy scramble">⧉</button>
+          <label class="s-speed">
+            <span>Speed</span>
+            <input type="range" id="s-speed" min="1" max="10" step="1" value="6">
+          </label>
+          <span class="s-pos" id="s-pos">0 / 0</span>
+        </div>
+      </div>
+
+      <div class="overlay net" id="net">
+        <h2>2D Net</h2>
+      </div>
+
+      <div class="overlay p1" id="p1">
+        <section class="p1-section">
+          <h2>Robot <span class="tag mode-badge" id="robot-badge">STUB</span></h2>
+          <div class="robot-panel">
+            <label class="field">
+              <span>Port</span>
+              <div class="port-row">
+                <select id="robot-port"></select>
+                <button id="robot-refresh" title="Refresh port list">↻</button>
+              </div>
+            </label>
+            <button id="robot-toggle">Connect</button>
+            <button id="robot-calibrate" disabled>Calibrate</button>
+            <button id="robot-config">Robot Configuration</button>
+            <div class="robot-status" id="robot-status">Stub mode: no hardware</div>
+            <div class="fake-panel" id="fake-panel" hidden>
+              <div class="fake-divider">Fake robot test bench</div>
+              <div class="fake-buttons">
+                <button id="fake-ack">Ack</button>
+                <button id="fake-error">Error</button>
+                <button id="fake-auto" class="on">Auto</button>
+              </div>
+              <div class="fake-log-head">Moves</div>
+              <div class="fake-log" id="fake-log"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="p1-section">
+          <h2>General Control</h2>
+          <div class="controls">
+            <label class="slider">
+              <span>Gap</span>
+              <input type="range" id="c-gap" min="0.02" max="0.3" step="0.01" value="0.05">
+            </label>
+            <label class="slider">
+              <span>Speed</span>
+              <input type="range" id="c-speed" min="1" max="10" step="1" value="6">
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="c-labels"><span>Labels</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="c-transparent"><span>Transparent</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="c-hidden"><span>Show hidden</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="c-light"><span>Light theme</span>
+            </label>
+            <div class="debug-buttons">
+              <button id="open-cubestate" class="debug-btn">Cube State</button>
+              <button id="open-syn" class="debug-btn">Syn</button>
+            </div>
+          </div>
+        </section>
+
+        <button id="clean-toggle" class="clean-toggle-btn" title="Hide all panels">Clean Screen</button>
+      </div>
+
+      <div class="floating" id="float-cubestate" hidden>
+        <div class="float-head" data-drag>
+          <span>Cube State</span>
+          <button class="float-close" data-target="float-cubestate">×</button>
+        </div>
+        <div class="float-body">
+          <svg id="float-cubestate-net" viewBox="0 0 13.5 10" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="float-caption" id="float-cubestate-caption">: </div>
+        </div>
+      </div>
+
+      <div class="floating" id="float-robot-config" hidden>
+        <div class="float-head" data-drag>
+          <span>Robot Configuration</span>
+          <button class="float-close" data-target="float-robot-config">×</button>
+        </div>
+        <div class="float-body">
+          <div class="rc-field">
+            <span>Baud rate</span>
+            <select id="rc-baud">
+              <option>9600</option>
+              <option>19200</option>
+              <option>38400</option>
+              <option>57600</option>
+              <option selected>115200</option>
+              <option>230400</option>
+            </select>
+          </div>
+          <div class="rc-field">
+            <span>Move timeout</span>
+            <input type="number" id="rc-timeout" min="1" max="120" step="1" value="30">
+          </div>
+          <div class="rc-field">
+            <span>Fake delay</span>
+            <div class="rc-range-row">
+              <input type="range" id="rc-fake-delay" min="0" max="2" step="0.05" value="0.2">
+              <span class="rc-value" id="rc-fake-delay-val">0.20s</span>
+            </div>
+          </div>
+          <div class="rc-field">
+            <span>Ack mode</span>
+            <div class="rc-buttons">
+              <button id="rc-mode-auto" class="on">Auto</button>
+              <button id="rc-mode-manual">Manual</button>
+            </div>
+          </div>
+          <div class="rc-note">
+            Baud rate and move timeout apply on the next connect. Fake delay
+            and ack mode apply immediately.
+          </div>
+        </div>
+      </div>
+
+      <div class="floating" id="float-syn" hidden>
+        <div class="float-head" data-drag>
+          <span>Syn</span>
+          <button class="float-close" data-target="float-syn">×</button>
+        </div>
+        <div class="float-body">
+          <div class="float-row"><span>state:</span><b id="syn-playing">idle</b></div>
+          <div class="float-row"><span>mode:</span><b id="syn-mode">: </b></div>
+          <div class="float-row"><span>current:</span><b id="syn-current">: </b></div>
+          <div class="float-row"><span>queue:</span><b id="syn-queue">0</b></div>
+          <div class="float-row"><span>done:</span><b id="syn-done">0</b></div>
+          <div class="float-row"><span>last:</span><b id="syn-last">: </b></div>
+          <div class="float-row error"><span>error:</span><b id="syn-error">: </b></div>
+        </div>
+      </div>
+
+      <div class="overlay p2" id="p2">
+        <div class="p2-toast" id="p2-toast"></div>
+        <h2>Input / s.move</h2>
+        <div class="controls">
+          <input type="text" id="c-input" placeholder="e.g. R U R' U' F2">
+          <button id="a-execute">Execute</button>
+        </div>
+      </div>
+
+      <aside class="sidebar" id="p3">
+        <section class="side-top">
+          <h2>Cube Control</h2>
+          <div class="actions">
+            <button id="a-get-scramble">Get Scramble</button>
+            <button id="a-do-scramble">Do Scramble</button>
+            <button id="a-reset-scramble" disabled>Reset to Scramble</button>
+            <button id="a-set-state">Set State</button>
+            <button id="a-go-to-state" disabled>Go to State</button>
+            <button id="a-reset">Reset</button>
+          </div>
+          <div class="solver-section">
+            <div class="solver-head">Solve</div>
+            <div class="solver-mode-buttons">
+              <button class="mode-btn on" data-mode="scramble">Scramble</button>
+              <button class="mode-btn"    data-mode="current">Current</button>
+            </div>
+            <div class="solver-grid">
+              <button class="solver-btn" data-method="cfop">CFOP</button>
+              <button class="solver-btn" data-method="kociemba">Kociemba</button>
+              <button class="solver-btn" data-method="roux">Roux</button>
+              <button class="solver-btn" data-method="zz">ZZ</button>
+            </div>
+
+            <div class="solve-preview">
+              <div class="solve-label" id="solve-label"></div>
+              <div class="solve-text" id="solve-text"></div>
+              <div class="solve-bar" id="solve-bar" hidden>
+                <div class="solve-steps">
+                  <button class="s-btn" id="sv-prev" title="Previous move">⏮</button>
+                  <button class="s-btn" id="sv-play" title="Play / Pause">▶</button>
+                  <button class="s-btn" id="sv-next" title="Next move">⏭</button>
+                  <button class="s-btn s-copy" id="sv-copy" title="Copy solution">⧉</button>
+                </div>
+                <div class="solve-speed-row">
+                  <label class="s-speed">
+                    <span>Speed</span>
+                    <input type="range" id="sv-speed" min="1" max="10" step="1" value="6">
+                  </label>
+                  <span class="s-pos" id="sv-pos">0 / 0</span>
+                </div>
+              </div>
+              <button id="a-do-solve" class="do-solve-btn" disabled>Do Solve</button>
+
+              <div class="solve-timer-big" id="solve-timer">0.00</div>
+
+              <div class="solve-stats">
+                <div class="solve-stats-head">
+                  solve: <b id="solve-count">0/0</b>
+                  <span class="sep">·</span>
+                  mean: <b id="solve-mean">: </b>
+                  <button class="solve-stats-reset" id="solve-stats-reset" title="Clear history">↺</button>
+                </div>
+                <table class="solve-stats-table">
+                  <thead>
+                    <tr><th>#</th><th>time</th><th>ao5</th><th>ao12</th></tr>
+                  </thead>
+                  <tbody id="solve-stats-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="modal-overlay" id="state-modal" hidden>
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Set Cube State</h2>
+          <button class="modal-close" id="state-close" title="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="state-editor-view" id="state-editor-view">
+            <div class="state-palette" id="state-palette"></div>
+            <div class="state-net-wrap">
+              <svg class="state-net-svg" id="state-net" viewBox="0 0 13.5 10" preserveAspectRatio="xMidYMid meet"></svg>
+              <div class="color-popup" id="color-popup" hidden></div>
+            </div>
+            <div class="state-message" id="state-message"></div>
+          </div>
+          <div class="state-camera-view" id="state-camera-view" hidden>
+            <video id="state-camera-video" playsinline muted></video>
+            <canvas id="state-camera-canvas"></canvas>
+            <span class="camera-beta-badge">beta</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="state-camera">Camera</button>
+          <button id="state-cancel">Cancel</button>
+          <button id="state-check">Check</button>
+          <button id="state-save" disabled>Save</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/space.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+﻿# Core :  required to run the app
+fastapi
+uvicorn
+kociemba
+pyserial
+
+# Optional :  only needed for the webcam cube scanner (local use)
+opencv-python
+numpy
