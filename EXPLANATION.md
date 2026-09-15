@@ -206,7 +206,7 @@ The hosted demo runs the actual backend. It is the real application, not a recor
 
 ## 10. Honest Limits
 
-- CFOP, Roux, and ZZ are selector stubs over Kociemba today (§5).
+- CFOP, Roux, and ZZ are selector stubs over Kociemba today .
 - A batch solve that fails mid-run stops and reports status, but there is no structured "failed at move N, here's the recovery" flow; recovery is a re-scan.
 - The HSV scanner wants decent lighting; there is no white-balance calibration pass yet.
 
